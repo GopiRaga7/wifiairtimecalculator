@@ -327,14 +327,152 @@ Control Frame Duration = ceil(Total_Bits / Bits_per_Symbol) × 4μs
 
 ### 4.5 OFDMA Resource Unit Calculations (Scenario 4)
 
-#### **Resource Unit Allocation**
-```
-Data Subcarriers per User = Total_RU_Subcarriers / Number_of_Users
+#### **IEEE 802.11ax Resource Unit Concepts**
+OFDMA (Orthogonal Frequency Division Multiple Access) allows multiple users to transmit simultaneously using different subcarriers. Resource Units (RUs) are predefined allocations of subcarriers assigned to each user.
 
-HE-SIG-B overhead varies by bandwidth and user count:
-- More users → More signaling bits required
-- Larger bandwidth → More RU allocation information
+#### **Resource Unit Types in 802.11ax:**
+- **26-tone RU**: 26 subcarriers per user
+- **52-tone RU**: 52 subcarriers per user  
+- **106-tone RU**: 106 subcarriers per user
+- **242-tone RU**: 242 subcarriers per user
+- **484-tone RU**: 484 subcarriers per user
+- **996-tone RU**: 996 subcarriers per user
+- **2×996-tone RU**: 1992 subcarriers per user
+
+#### **How RU Allocation Works in the Calculator**
+
+The calculator uses predefined RU allocation tables based on IEEE 802.11ax specifications:
+
+```javascript
+const ofdma_map = {
+    20: {
+        1: {data_sub:234, bits_sigb:20},  // Single user = full bandwidth
+        2: {data_sub:117, bits_sigb:40},  // 2 users = ~106-tone RUs each  
+        4: {data_sub:52, bits_sigb:80},   // 4 users = 52-tone RUs each
+        9: {data_sub:26, bits_sigb:180}   // 9 users = 26-tone RUs each
+    },
+    // ... similar for 40MHz, 80MHz, 160MHz
+};
 ```
+
+#### **Example: 80 MHz Channel with Different User Counts**
+
+**Case 1: 2 Users in 80 MHz**
+```
+Total subcarriers available: 980 (80 MHz HE)
+Allocation: 2 × 484-tone RUs (approximately)
+Data subcarriers per user: 490
+HE-SIG-B overhead: 40 bits
+```
+
+**Case 2: 4 Users in 80 MHz**  
+```
+Total subcarriers available: 980 (80 MHz HE)
+Allocation: 4 × 242-tone RUs (approximately)
+Data subcarriers per user: 245
+HE-SIG-B overhead: 80 bits
+```
+
+**Case 3: 8 Users in 80 MHz**
+```
+Total subcarriers available: 980 (80 MHz HE)  
+Allocation: 8 × 106-tone RUs (approximately)
+Data subcarriers per user: 117
+HE-SIG-B overhead: 160 bits
+```
+
+#### **Step-by-Step OFDMA Calculation Process**
+
+**Step 1: RU Selection**
+```
+Based on (bandwidth, users), lookup predefined RU allocation:
+- data_sub = subcarriers per user from ofdma_map
+- bits_sigb = HE-SIG-B overhead bits
+```
+
+**Step 2: Data Rate per User**
+```
+Data_Bits_per_Symbol_per_User = data_sub × MCS_bits × Coding_Rate × Spatial_Streams
+
+Example for MCS 7, 1 spatial stream:
+- 2 users, 80MHz: 490 × 6 × (5/6) × 1 = 2450 bits/symbol/user
+- 4 users, 80MHz: 245 × 6 × (5/6) × 1 = 1225 bits/symbol/user
+```
+
+**Step 3: Data Duration Calculation**
+```
+Per_User_Data_Bits = 16 + A-MPDU_bytes × 8 + 6
+Per_User_Symbols = ceil(Per_User_Data_Bits / Data_Bits_per_Symbol_per_User)
+Data_Duration = Per_User_Symbols × HE_Symbol_Duration
+
+Note: All users transmit simultaneously, so total duration = individual user duration
+```
+
+**Step 4: HE-SIG-B Overhead Calculation**
+```
+HE-SIG-B encodes resource allocation information for all users:
+- Which RUs are assigned to which users
+- MCS information per user
+- Power allocation details
+
+HE-SIG-B_Duration = ceil(bits_sigb / 26) × 4μs
+Where 26 = MCS0 bits per symbol for signaling
+```
+
+#### **Detailed Comparison: 2 Users vs 4 Users (80 MHz Example)**
+
+**Scenario: 80 MHz, A-MPDU=1500 bytes, MCS 7, 1 spatial stream**
+
+**2 Users Configuration:**
+```
+Resource Allocation:
+- Each user gets: 490 subcarriers (≈484-tone RU)
+- Data rate per user: 490 × 6 × (5/6) = 2450 bits/symbol
+- HE-SIG-B overhead: 40 bits
+
+Data Calculation per User:
+- Total bits: 16 + (1500 × 8) + 6 = 12,022 bits
+- Symbols needed: ceil(12,022 / 2450) = 5 symbols
+- Data duration: 5 × (12.8 + GI) μs
+
+HE-SIG-B Duration:
+- ceil(40 / 26) × 4 = 2 × 4 = 8 μs
+
+Total Preamble: 20 + 4 + 8 + 8 + 4 + (6.4 × NSS) = 44 + 6.4 = 50.4 μs
+```
+
+**4 Users Configuration:**
+```
+Resource Allocation:
+- Each user gets: 245 subcarriers (≈242-tone RU)  
+- Data rate per user: 245 × 6 × (5/6) = 1225 bits/symbol
+- HE-SIG-B overhead: 80 bits
+
+Data Calculation per User:
+- Total bits: 16 + (1500 × 8) + 6 = 12,022 bits
+- Symbols needed: ceil(12,022 / 1225) = 10 symbols  
+- Data duration: 10 × (12.8 + GI) μs
+
+HE-SIG-B Duration:
+- ceil(80 / 26) × 4 = 4 × 4 = 16 μs
+
+Total Preamble: 20 + 4 + 8 + 16 + 4 + (6.4 × NSS) = 52 + 6.4 = 58.4 μs
+```
+
+#### **Key OFDMA Observations:**
+
+**Efficiency Trade-offs:**
+- **2 Users**: Higher per-user throughput, less signaling overhead
+- **4 Users**: Lower per-user throughput, more signaling overhead, better spectrum utilization
+
+**Overhead Impact:**
+- More users → More HE-SIG-B bits → Longer preamble
+- Fewer subcarriers per user → More symbols needed → Longer data transmission
+
+**Real-world Implications:**
+- **Small Packets**: More users may be inefficient due to overhead
+- **Large Packets**: More users can improve overall efficiency
+- **Mixed Traffic**: Dynamic allocation based on queue lengths
 
 ### 4.6 Total Airtime Calculation
 
