@@ -181,6 +181,27 @@ The calculator provides two key metrics:
 Throughput (Mbps) = (A-MPDU size × 8 bits) / (Total Duration × 10^-6 seconds) / 10^6
 ```
 
+**Step-by-step verification:**
+```
+1. A-MPDU size × 8 = Total bits transmitted
+2. Total Duration × 10^-6 = Duration in seconds (since duration is in microseconds)
+3. Bits ÷ Seconds = Bits per second
+4. Bits per second ÷ 10^6 = Megabits per second (Mbps)
+```
+
+**Example calculation:**
+```
+A-MPDU size = 1500 bytes
+Total Duration = 100 microseconds
+
+Step 1: 1500 × 8 = 12,000 bits
+Step 2: 100 × 10^-6 = 0.0001 seconds  
+Step 3: 12,000 ÷ 0.0001 = 120,000,000 bits/second
+Step 4: 120,000,000 ÷ 10^6 = 120 Mbps
+```
+
+**✅ Formula is CORRECT** - This matches the implementation in the calculator code.
+
 ### 3.2 Airtime Bar Graph
 
 The horizontal bar chart shows the duration breakdown of each component:
